@@ -7,8 +7,10 @@
 
   var CHINA_BOUNDS = [[18.2, 73.4], [53.9, 135.2]];
   var TILE_URL = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}';
-  var API_URL = 'api/markers';
-  var ADMIN_URL = 'api/admin';
+  var API_BASE = document.querySelector('meta[name="qunyou-api-base"]')?.content || '';
+  var API_URL = API_BASE + 'api/markers';
+  var ADMIN_URL = API_BASE + 'api/admin';
+  var SS_ADMIN = 'qunmap.adminSession.v1';
   var LS_MARKERS = 'qunmap.markers.v1';
   var LS_OWNER = 'qunmap.owner.v2';
   var LS_MAP_MODE = 'qunmap.mapmode.v1';
@@ -84,6 +86,7 @@
     markers: [],
     ownerKey: null,
     admin: false,
+    adminToken: '',
     adminMarkers: [],
     manageView: 'mine',
     manageBusy: false,
@@ -148,6 +151,9 @@
     };
 
     state.ownerKey = getOwnerKey();
+    if (API_BASE) {
+      try { state.adminToken = sessionStorage.getItem(SS_ADMIN) || ''; } catch (error) { /* 仅本次会话 */ }
+    }
     loadData();
   }
 
@@ -591,18 +597,19 @@
     state.ready = false;
     setMode('loading');
     try {
-      if (location.protocol === 'file:' || document.documentElement.hasAttribute('data-hosted-preview')) {
+      if (location.protocol === 'file:' || !API_BASE) {
         state.markers = readLocal();
         setMode('local');
       } else {
         var data = await readServerMarkers(false);
         state.admin = data.admin;
+        if (API_BASE && !data.admin) setAdminToken('');
         state.markers = sortMarkers(data.markers.concat(readLocal()));
         setMode('shared');
       }
     } catch (error) {
       state.markers = readLocal();
-      setMode(error.status === 404 ? 'local' : 'error');
+      setMode(!API_BASE && error.status === 404 ? 'local' : 'error');
       if (state.mode === 'error') toast(error.message, 5000);
     } finally {
       state.ready = true;
@@ -610,14 +617,23 @@
     }
   }
 
+  function setAdminToken(value) {
+    state.adminToken = value;
+    try {
+      if (value) sessionStorage.setItem(SS_ADMIN, value);
+      else sessionStorage.removeItem(SS_ADMIN);
+    } catch (error) { /* 仅本次会话 */ }
+  }
+
   async function requestApi(path, method, body) {
     var headers = { Accept: 'application/json' };
     if (state.ownerKey) headers['X-Owner-Key'] = state.ownerKey;
+    if (API_BASE && state.adminToken) headers.Authorization = 'Bearer ' + state.adminToken;
     if (body) headers['Content-Type'] = 'application/json';
     var response;
     try {
       response = await fetch(path, {
-        method: method, headers: headers, cache: "no-store",
+        method: method, headers: headers, cache: "no-store", credentials: API_BASE ? 'omit' : 'same-origin',
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(15000)
       });
@@ -969,7 +985,7 @@
     var modes = {
       loading: ['连接中', '正在读取群友标记'],
       error: ['服务未连接', '点底部按钮重试连接'],
-      local: ['浏览器体验', '标记只保存在当前浏览器'],
+      local: ['本地预览', '标记只保存在当前浏览器'],
       shared: ['共享模式', '所有访客都能看到未到期的共享标记']
     };
     els.mode.textContent = modes[mode][0];
@@ -1345,7 +1361,7 @@
     els.manageList.replaceChildren();
     if (adminView && !signedIn) {
       if (!onServer) {
-        els.manageStatus.textContent = state.ready ? '共享服务接入后可以使用管理员模式。' : '正在连接标记服务…';
+        els.manageStatus.textContent = state.ready ? '请通过本机服务器或共享网站打开，才能使用管理员模式。' : '正在连接标记服务…';
       }
       return;
     }
@@ -1434,6 +1450,7 @@
       refreshUI();
     } catch (error) {
       if (error.status === 401) {
+        if (API_BASE) setAdminToken('');
         state.admin = false;
         state.adminMarkers = [];
       }
@@ -1451,7 +1468,11 @@
     els.manageStatus.textContent = '';
     renderManage();
     try {
-      await requestApi(ADMIN_URL, 'POST', { action: 'login', password: els.adminPassword.value });
+      var login = await requestApi(ADMIN_URL, 'POST', { action: 'login', password: els.adminPassword.value });
+      if (API_BASE) {
+        if (!login.token) throw new Error('没有收到管理员会话。');
+        setAdminToken(login.token);
+      }
       state.admin = true;
       els.adminPassword.value = '';
     } catch (error) {
@@ -1469,6 +1490,7 @@
     renderManage();
     try {
       await requestApi(ADMIN_URL, 'POST', { action: 'logout' });
+      if (API_BASE) setAdminToken('');
       state.admin = false;
       state.adminMarkers = [];
       els.manageStatus.textContent = '已退出管理员模式。';
