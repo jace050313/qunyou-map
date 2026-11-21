@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-hosted-preview>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="在群友地图上留下你的大致位置，看看群友都在哪儿。">
+<meta name="theme-color" content="#f6f3ed">
+<title>群友地图 · 看看群友都在哪儿</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="map" aria-label="群友位置地图"></div>
+
+<header class="brand" aria-labelledby="appTitle">
+  <span class="brand-logo" aria-hidden="true">
+    <svg viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="6.4" fill="currentColor"/>
+      <ellipse cx="16" cy="16" rx="13.2" ry="5.2" stroke="currentColor" stroke-width="1.5" transform="rotate(-32 16 16)"/>
+      <circle cx="25.4" cy="7.2" r="2" fill="currentColor"/>
+    </svg>
+  </span>
+  <div class="brand-copy">
+    <h1 id="appTitle">群友地图</h1>
+    <p class="brand-meta">
+      <span id="count">正在载入…</span>
+      <span class="meta-dot" aria-hidden="true"></span>
+      <span id="mode" class="mode">连接中</span>
+    </p>
+  </div>
+</header>
+
+<div id="peopleScrim" class="people-scrim" hidden></div>
+
+<aside id="peoplePanel" class="people" aria-labelledby="peopleTitle">
+  <div class="people-head">
+    <div class="people-heading">
+      <h2 id="peopleTitle">群友</h2>
+      <p class="people-sub">点一下，飞到 Ta 在的地方</p>
+    </div>
+    <span id="peopleCount" class="people-count">0</span>
+    <button id="peopleClose" class="icon-btn people-close" type="button" aria-label="收起群友列表">×</button>
+  </div>
+  <ol id="peopleList" class="people-list" aria-label="全部群友"></ol>
+  <p id="peopleEmpty" class="people-empty" hidden>还没有人留下位置。</p>
+</aside>
+
+<button id="peopleToggle" class="people-toggle" type="button" aria-controls="peoplePanel" aria-expanded="true">
+  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M4 5.5h12M4 10h12M4 14.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+  <span>群友</span>
+  <b id="peopleToggleCount">0</b>
+</button>
+
+<div id="mapMode" class="map-mode" role="group" aria-label="地图模式">
+  <button type="button" data-map-mode="standard" aria-pressed="true" title="道路和地点，适合日常查看">标准</button>
+  <button type="button" data-map-mode="simple" aria-pressed="false" title="全球国界和中国省界，放大可看国内城市">省界</button>
+</div>
+
+<div id="pickHint" class="pick-hint" hidden>
+  <span class="hint-dot" aria-hidden="true"></span>
+  点击地图选点，或拖动头像微调
+</div>
+
+<section id="sheet" class="sheet" role="dialog" aria-modal="false" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-head">
+    <div>
+      <h2 id="sheetTitle">标记我的位置</h2>
+      <p id="sheetSub" class="sheet-sub">在地图上点一个大致位置</p>
+    </div>
+    <button id="closeSheet" class="icon-btn" type="button" aria-label="关闭表单">×</button>
+  </div>
+  <form id="pinForm" novalidate>
+    <label class="field">
+      <span class="field-label">名字 <em>必填</em></span>
+      <input id="name" name="name" maxlength="16" autocomplete="nickname" placeholder="群友怎么称呼你" required>
+    </label>
+    <fieldset class="field emoji-field">
+      <legend class="field-label">头像 <em>选填</em></legend>
+      <div id="emojiPicker" class="emoji-picker" role="group" aria-label="选择头像 emoji">
+        <button type="button" class="emoji-option is-selected" data-emoji="" aria-pressed="true" title="用名字首字"><span class="emoji-char emoji-initial">Aa</span></button>
+        <button type="button" class="emoji-option" data-emoji="😀" aria-pressed="false" title="笑脸">😀</button>
+        <button type="button" class="emoji-option" data-emoji="😄" aria-pressed="false" title="开心">😄</button>
+        <button type="button" class="emoji-option" data-emoji="😎" aria-pressed="false" title="酷">😎</button>
+        <button type="button" class="emoji-option" data-emoji="🥳" aria-pressed="false" title="庆祝">🥳</button>
+        <button type="button" class="emoji-option" data-emoji="🐱" aria-pressed="false" title="猫">🐱</button>
+        <button type="button" class="emoji-option" data-emoji="🐶" aria-pressed="false" title="狗">🐶</button>
+        <button type="button" class="emoji-option" data-emoji="🐼" aria-pressed="false" title="熊猫">🐼</button>
+        <button type="button" class="emoji-option" data-emoji="🦊" aria-pressed="false" title="狐狸">🦊</button>
+        <button type="button" class="emoji-option" data-emoji="🐸" aria-pressed="false" title="青蛙">🐸</button>
+        <button type="button" class="emoji-option" data-emoji="🐳" aria-pressed="false" title="鲸鱼">🐳</button>
+        <button type="button" class="emoji-option" data-emoji="🍊" aria-pressed="false" title="橘子">🍊</button>
+        <button type="button" class="emoji-option" data-emoji="🍓" aria-pressed="false" title="草莓">🍓</button>
+        <button type="button" class="emoji-option" data-emoji="🍰" aria-pressed="false" title="蛋糕">🍰</button>
+        <button type="button" class="emoji-option" data-emoji="🍜" aria-pressed="false" title="面">🍜</button>
+        <button type="button" class="emoji-option" data-emoji="🍵" aria-pressed="false" title="茶">🍵</button>
+        <button type="button" class="emoji-option" data-emoji="🎧" aria-pressed="false" title="耳机">🎧</button>
+        <button type="button" class="emoji-option" data-emoji="🎸" aria-pressed="false" title="吉他">🎸</button>
+        <button type="button" class="emoji-option" data-emoji="🚀" aria-pressed="false" title="火箭">🚀</button>
+        <button type="button" class="emoji-option" data-emoji="✈️" aria-pressed="false" title="飞机">✈️</button>
+        <button type="button" class="emoji-option" data-emoji="🪐" aria-pressed="false" title="行星">🪐</button>
+        <button type="button" class="emoji-option" data-emoji="🌈" aria-pressed="false" title="彩虹">🌈</button>
+        <button type="button" class="emoji-option" data-emoji="⚽" aria-pressed="false" title="足球">⚽</button>
+        <button type="button" class="emoji-option" data-emoji="🔥" aria-pressed="false" title="火焰">🔥</button>
+        <button type="button" class="emoji-option" data-emoji="🌰" aria-pressed="false" title="栗子">🌰</button>
+        <button type="button" class="emoji-option" data-emoji="🚦" aria-pressed="false" title="信号灯">🚦</button>
+        <button type="button" class="emoji-option" data-emoji="🥐" aria-pressed="false" title="面包">🥐</button>
+        <button type="button" class="emoji-option" data-emoji="🍧" aria-pressed="false" title="冰沙">🍧</button>
+        <button type="button" class="emoji-option" data-emoji="🍬" aria-pressed="false" title="糖">🍬</button>
+        <button type="button" class="emoji-option" data-emoji="🍡" aria-pressed="false" title="团子">🍡</button>
+        <button type="button" class="emoji-option" data-emoji="🐚" aria-pressed="false" title="螺">🐚</button>
+        <button type="button" class="emoji-option" data-emoji="🪁" aria-pressed="false" title="风筝">🪁</button>
+      </div>
+    </fieldset>
+    <div class="avatar-upload">
+      <label class="field-label" for="avatarFile">上传头像</label>
+      <div class="avatar-input-row">
+        <input id="avatarFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif">
+        <button id="clearAvatar" class="manage-link" type="button" hidden>移除照片</button>
+      </div>
+      <p id="avatarStatus" class="sheet-sub" role="status"></p>
+    </div>
+    <div class="duration-fields">
+      <label class="field">
+        <span class="field-label">标记有效期</span>
+        <select id="duration">
+          <option value="keep" hidden>保留当前有效期</option>
+          <option value="long">长期</option>
+          <option value="days">持续指定天数</option>
+        </select>
+      </label>
+      <label id="durationDaysField" class="field" hidden>
+        <span class="field-label">天数</span>
+        <input id="durationDays" type="number" min="1" max="3650" step="1" inputmode="numeric" placeholder="如 7">
+      </label>
+    </div>
+    <div class="coord-row">
+      <span id="preview" class="preview" aria-hidden="true"></span>
+      <span id="coord" class="coord">尚未选点</span>
+    </div>
+    <p id="formError" class="form-error" role="alert"></p>
+    <div class="actions">
+      <button type="button" id="cancel" class="ghost">取消</button>
+      <button type="submit" id="save" class="primary">保存</button>
+    </div>
+    <p id="note" class="note">保存后会立即显示在地图上。坐标会自动模糊到约 1 公里。</p>
+    <button type="button" id="remove" class="remove" hidden>删除这个标记</button>
+  </form>
+</section>
+
+<div class="cta-wrap">
+  <button id="pickBtn" class="cta" type="button">
+    <span class="cta-plus" aria-hidden="true">＋</span>
+    <span id="pickLabel">标记我的位置</span>
+  </button>
+  <div class="cta-tools">
+    <button id="myMarkers" class="manage-link" type="button" aria-haspopup="dialog">我的标记</button>
+    <button id="adminButton" class="manage-link" type="button" aria-haspopup="dialog">管理员</button>
+  </div>
+</div>
+
+<dialog id="manageDialog" class="manage-dialog" aria-labelledby="manageTitle">
+  <div class="sheet-head">
+    <h2 id="manageTitle">我的标记</h2>
+    <button id="closeManage" class="icon-btn" type="button" aria-label="关闭管理窗口">×</button>
+  </div>
+  <form id="adminForm" hidden>
+    <label class="field">
+      <span class="field-label">管理员密码</span>
+      <input id="adminPassword" type="password" inputmode="numeric" autocomplete="current-password" required maxlength="128">
+    </label>
+    <button id="adminLogin" class="primary" type="submit">进入管理员模式</button>
+  </form>
+  <p id="manageStatus" class="form-error" role="status"></p>
+  <ul id="manageList" class="manage-list"></ul>
+  <div id="adminTools" class="manage-footer" hidden>
+    <button id="adminRefresh" class="ghost" type="button">刷新列表</button>
+    <button id="adminLogout" class="ghost" type="button">退出管理员</button>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<noscript>
+  <p class="noscript">群友地图需要开启 JavaScript 才能显示。</p>
+</noscript>
+
+<script src="china-geo.js"></script>
+<script src="world-geo.js"></script>
+<script src="leaflet.js"></script>
+<script src="app.js" defer></script>
+</body>
+</html>
