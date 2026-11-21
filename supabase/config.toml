@@ -1,0 +1,4 @@
+project_id = "qunyou-map"
+
+[functions.qunyou-map]
+verify_jwt = false
